@@ -154,9 +154,12 @@ private:
 	sqlite3_stmt *stmt;
 	map<string, string> headersMap;
 	vector<string> movesList;
-	int index = 0;
+	int game_index = 0;
 	// Used to skip already added indexes
 	int table_count_elo_fen_outcomes = 0;
+	// Skip opening and endgame moves as they won't be useful
+	const int OPENING_MOVES_LIMITER = 10;
+	const int ENDGAME_MOVES_LIMITER = 10;
 
 	void startPgn()
 	{
@@ -166,7 +169,7 @@ private:
 	void header(string_view key, string_view value)
 	{
 		// Skip already added games
-		if (index < table_count_elo_fen_outcomes)
+		if (game_index < table_count_elo_fen_outcomes)
 		{
 			return;
 		}
@@ -183,7 +186,7 @@ private:
 	void move(string_view move, string_view comment)
 	{
 		// Skip already added games
-		if (index < table_count_elo_fen_outcomes)
+		if (game_index < table_count_elo_fen_outcomes)
 		{
 			return;
 		}
@@ -193,14 +196,14 @@ private:
 	void endPgn()
 	{
 		// Skip already added games
-		if (index < table_count_elo_fen_outcomes)
+		if (game_index < table_count_elo_fen_outcomes)
 		{
-			index += 1;
+			game_index += 1;
 
 			return;
 		}
 		// Used for early stopping
-		// if (index == 100000)
+		// if (game_index == 100000)
 		// {
 		// 	abort();
 		// }
@@ -223,10 +226,16 @@ private:
 			)";
 
 			Board board;
-			for (auto moveString : movesList)
+			const int MOVES_NUMBER = movesList.size();
+			for (int i = 0; i < MOVES_NUMBER - ENDGAME_MOVES_LIMITER; i++)
 			{
-				Move moveObj = uci::parseSan(board, string(moveString));
+				Move moveObj = uci::parseSan(board, string(movesList[i]));
 				board.makeMove(moveObj);
+
+				if (i < OPENING_MOVES_LIMITER)
+				{
+					continue;
+				}
 
 				string Site = headersMap["Site"];
 				string PositionFen = board.getFen();
@@ -263,10 +272,10 @@ private:
 			cout << "Resuming parsing..." << endl;
 		}
 
-		index += 1;
-		if (index % 100000 == 0)
+		game_index += 1;
+		if (game_index % 100000 == 0)
 		{
-			cout << "Finished parsing game number: " << index << endl;
+			cout << "Finished parsing game number: " << game_index << endl;
 		}
 	}
 	static int save_count_table_pgn_games(void *count, int argc, char **argv, char **azColName)
